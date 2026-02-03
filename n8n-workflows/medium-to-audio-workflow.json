@@ -49,7 +49,7 @@
     {
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "// Check if article was already processed\nconst fs = require('fs');\nconst path = '/home/node/data/processed_articles.json';\n\nlet processed = [];\ntry {\n  if (fs.existsSync(path)) {\n    processed = JSON.parse(fs.readFileSync(path, 'utf8'));\n  }\n} catch (e) {\n  processed = [];\n}\n\nconst items = $input.all();\nconst newItems = items.filter(item => {\n  const guid = item.json.guid || item.json.link;\n  return !processed.includes(guid);\n});\n\nif (newItems.length === 0) {\n  return [{ json: { skip: true, message: 'No new articles' } }];\n}\n\nreturn newItems;"
+        "jsCode": "// Check if article was already processed using n8n static data\nconst staticData = $getWorkflowStaticData('global');\n\n// Initialize processed array if not exists\nif (!staticData.processed) {\n  staticData.processed = [];\n}\n\nconst items = $input.all();\nconst newItems = items.filter(item => {\n  const guid = item.json.guid || item.json.link;\n  return !staticData.processed.includes(guid);\n});\n\nif (newItems.length === 0) {\n  return [{ json: { skip: true, message: 'No new articles' } }];\n}\n\nreturn newItems;"
       },
       "id": "filter-processed",
       "name": "Filter Processed",
@@ -205,7 +205,7 @@
     {
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "// Save processed article to avoid duplicates\nconst fs = require('fs');\nconst path = '/home/node/data/processed_articles.json';\n\nlet processed = [];\ntry {\n  if (fs.existsSync(path)) {\n    processed = JSON.parse(fs.readFileSync(path, 'utf8'));\n  }\n} catch (e) {\n  processed = [];\n}\n\n// Add new article GUID\nconst guid = $('Parse Claude Response').item.json.guid;\nif (!processed.includes(guid)) {\n  processed.push(guid);\n}\n\n// Keep only last 100 articles\nif (processed.length > 100) {\n  processed = processed.slice(-100);\n}\n\n// Ensure directory exists\nconst dir = '/home/node/data';\nif (!fs.existsSync(dir)) {\n  fs.mkdirSync(dir, { recursive: true });\n}\n\nfs.writeFileSync(path, JSON.stringify(processed, null, 2));\n\nreturn [{ json: { success: true, processed: processed.length } }];"
+        "jsCode": "// Save processed article to n8n static data\nconst staticData = $getWorkflowStaticData('global');\n\n// Initialize if not exists\nif (!staticData.processed) {\n  staticData.processed = [];\n}\n\n// Add new article GUID\nconst guid = $('Parse Claude Response').item.json.guid;\nif (!staticData.processed.includes(guid)) {\n  staticData.processed.push(guid);\n}\n\n// Keep only last 100 articles\nif (staticData.processed.length > 100) {\n  staticData.processed = staticData.processed.slice(-100);\n}\n\nreturn [{ json: { success: true, processed: staticData.processed.length } }];"
       },
       "id": "log-processed",
       "name": "Log Processed Article",
