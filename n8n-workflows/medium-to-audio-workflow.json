@@ -38,7 +38,7 @@
     {
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "// Parse RSS XML and extract articles\nconst xmlData = $input.first().json.data;\n\n// Simple XML parsing for RSS items\nconst items = [];\nconst itemRegex = /<item>(.*?)<\\/item>/gs;\nlet match;\n\nwhile ((match = itemRegex.exec(xmlData)) !== null) {\n  const itemXml = match[1];\n  \n  const getTag = (xml, tag) => {\n    const regex = new RegExp(`<${tag}[^>]*><!\\\\[CDATA\\\\[(.+?)\\\\]\\\\]><\\\\/${tag}>|<${tag}[^>]*>(.+?)<\\\\/${tag}>`, 's');\n    const m = xml.match(regex);\n    return m ? (m[1] || m[2] || '').trim() : '';\n  };\n  \n  items.push({\n    title: getTag(itemXml, 'title'),\n    link: getTag(itemXml, 'link'),\n    pubDate: getTag(itemXml, 'pubDate'),\n    content: getTag(itemXml, 'content:encoded') || getTag(itemXml, 'description'),\n    guid: getTag(itemXml, 'guid')\n  });\n}\n\n// Return only the first (newest) article\nreturn items.slice(0, 1).map(item => ({ json: item }));"
+        "jsCode": "// Parse RSS XML and extract articles\nconst xmlData = $input.first().json.data;\n\n// Simple XML parsing for RSS items\nconst items = [];\nconst itemRegex = /<item>(.*?)<\\/item>/gs;\nlet match;\n\nwhile ((match = itemRegex.exec(xmlData)) !== null) {\n  const itemXml = match[1];\n  \n  const getTag = (xml, tag) => {\n    const regex = new RegExp(`<${tag}[^>]*><!\\\\[CDATA\\\\[(.+?)\\\\]\\\\]><\\\\/${tag}>|<${tag}[^>]*>(.+?)<\\\\/${tag}>`, 's');\n    const m = xml.match(regex);\n    return m ? (m[1] || m[2] || '').trim() : '';\n  };\n  \n  items.push({\n    title: getTag(itemXml, 'title'),\n    link: getTag(itemXml, 'link'),\n    pubDate: getTag(itemXml, 'pubDate'),\n    content: getTag(itemXml, 'content:encoded') || getTag(itemXml, 'description'),\n    guid: getTag(itemXml, 'guid')\n  });\n}\n\n// Return first 20 articles for filtering\nreturn items.slice(0, 20).map(item => ({ json: item }));"
       },
       "id": "parse-rss",
       "name": "Parse RSS Feed",
@@ -49,7 +49,7 @@
     {
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "// Check if article was already processed using n8n static data\nconst staticData = $getWorkflowStaticData('global');\n\n// Initialize processed array if not exists\nif (!staticData.processed) {\n  staticData.processed = [];\n}\n\nconst items = $input.all();\nconst newItems = items.filter(item => {\n  const guid = item.json.guid || item.json.link;\n  return !staticData.processed.includes(guid);\n});\n\nif (newItems.length === 0) {\n  return [{ json: { skip: true, message: 'No new articles' } }];\n}\n\nreturn newItems;"
+        "jsCode": "// Check if article was already processed using n8n static data\nconst staticData = $getWorkflowStaticData('global');\n\n// Initialize processed array if not exists\nif (!staticData.processed) {\n  staticData.processed = [];\n}\n\nconst items = $input.all();\n\n// Filter out already processed articles\nconst newItems = items.filter(item => {\n  const guid = item.json.guid || item.json.link;\n  return !staticData.processed.includes(guid);\n});\n\n// If no new articles, return skip flag\nif (newItems.length === 0) {\n  return [{ json: { skip: true, message: 'No new articles found' } }];\n}\n\n// Return only the FIRST unprocessed article\nreturn [newItems[0]];"
       },
       "id": "filter-processed",
       "name": "Filter Processed",
