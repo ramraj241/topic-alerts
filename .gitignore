@@ -1,0 +1,55 @@
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# n8n data
+n8n_data/
+
+# Local data storage
+data/
+*.db
+*.sqlite
+
+# Audio files (generated)
+*.mp3
+*.wav
+*.ogg
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.Python
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/

@@ -1,0 +1,46 @@
+{
+  "app": {
+    "name": "AI Learning Agent for Medium",
+    "version": "1.0.0"
+  },
+  "schedule": {
+    "enabled": true,
+    "cron": "0 7 * * *",
+    "timezone": "America/New_York"
+  },
+  "ai": {
+    "provider": "openai",
+    "model": "gpt-4o-mini",
+    "max_tokens": 1000,
+    "temperature": 0.7,
+    "fallback_provider": "anthropic",
+    "fallback_model": "claude-3-haiku-20240307"
+  },
+  "tts": {
+    "provider": "openai",
+    "model": "tts-1",
+    "voice": "nova",
+    "speed": 1.0,
+    "format": "mp3"
+  },
+  "telegram": {
+    "send_audio": true,
+    "send_summary": true,
+    "send_link": true,
+    "max_message_length": 4096
+  },
+  "content": {
+    "max_explanation_words": 500,
+    "target_audio_minutes": 3,
+    "include_examples": true,
+    "connect_to_tools": ["Snowflake", "Spark", "Airflow", "Cloud"]
+  },
+  "storage": {
+    "processed_articles_file": "/home/node/data/processed_articles.json",
+    "max_history_days": 30
+  },
+  "retry": {
+    "max_attempts": 3,
+    "delay_seconds": 5
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "feeds": [
+    {
+      "name": "Medium Data Engineering",
+      "url": "https://medium.com/feed/tag/data-engineering",
+      "enabled": true,
+      "priority": 1
+    },
+    {
+      "name": "Towards Data Science",
+      "url": "https://towardsdatascience.com/feed",
+      "enabled": true,
+      "priority": 2
+    },
+    {
+      "name": "Medium Apache Spark",
+      "url": "https://medium.com/feed/tag/apache-spark",
+      "enabled": true,
+      "priority": 3
+    },
+    {
+      "name": "Medium Apache Airflow",
+      "url": "https://medium.com/feed/tag/airflow",
+      "enabled": true,
+      "priority": 4
+    },
+    {
+      "name": "Medium Snowflake",
+      "url": "https://medium.com/feed/tag/snowflake",
+      "enabled": true,
+      "priority": 5
+    },
+    {
+      "name": "Medium Data Pipeline",
+      "url": "https://medium.com/feed/tag/data-pipeline",
+      "enabled": false,
+      "priority": 6
+    },
+    {
+      "name": "Medium ETL",
+      "url": "https://medium.com/feed/tag/etl",
+      "enabled": false,
+      "priority": 7
+    }
+  ],
+  "settings": {
+    "articles_per_day": 1,
+    "min_read_time_minutes": 3,
+    "max_read_time_minutes": 15,
+    "skip_paywalled": true,
+    "language": "en"
+  }
+}
