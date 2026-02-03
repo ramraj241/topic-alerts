@@ -87,50 +87,78 @@
     },
     {
       "parameters": {
-        "resource": "chat",
-        "model": "gpt-4o-mini",
-        "messages": {
-          "values": [
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
             {
-              "content": "=You are my personal AI tutor.\n\nI am a Senior Data Engineer learning advanced systems and AI.\n\nExplain this Medium article in a simple way, then connect it to real-world data pipelines, Snowflake, Spark, Airflow, and cloud systems.\n\nRules:\n- Beginner-friendly language\n- Practical and actionable insights\n- No fluff or filler content\n- Include real examples\n- Keep it under 3 minutes when read aloud (approximately 450-500 words)\n\nStructure your response exactly as follows:\n\n1. SIMPLE OVERVIEW (60-80 words)\nStart with \"Today we're learning about...\" and give a clear, simple explanation.\n\n2. HOW THIS FITS IN REAL PIPELINES (100-120 words)\nConnect this to actual data pipeline work with Snowflake, Spark, Airflow, or cloud platforms.\n\n3. EXAMPLE FROM INDUSTRY (80-100 words)\nGive one concrete example of how a company might use this.\n\n4. KEY LESSON (40-60 words)\nEnd with \"The key lesson here is...\" - make it memorable and actionable.\n\n---\n\nARTICLE TO EXPLAIN:\n\nTitle: {{ $json.title }}\n\nContent:\n{{ $json.content }}"
+              "name": "x-api-key",
+              "value": "={{ $env.ANTHROPIC_API_KEY }}"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
             }
           ]
         },
-        "options": {
-          "temperature": 0.7,
-          "maxTokens": 800
-        }
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-3-haiku-20240307\",\n  \"max_tokens\": 1024,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"You are my personal AI tutor.\\n\\nI am a Senior Data Engineer learning advanced systems and AI.\\n\\nExplain this Medium article in a simple way, then connect it to real-world data pipelines, Snowflake, Spark, Airflow, and cloud systems.\\n\\nRules:\\n- Beginner-friendly language\\n- Practical and actionable insights\\n- No fluff or filler content\\n- Include real examples\\n- Keep it under 3 minutes when read aloud (approximately 450-500 words)\\n\\nStructure your response exactly as follows:\\n\\n1. SIMPLE OVERVIEW (60-80 words)\\nStart with \\\"Today we're learning about...\\\" and give a clear, simple explanation.\\n\\n2. HOW THIS FITS IN REAL PIPELINES (100-120 words)\\nConnect this to actual data pipeline work with Snowflake, Spark, Airflow, or cloud platforms.\\n\\n3. EXAMPLE FROM INDUSTRY (80-100 words)\\nGive one concrete example of how a company might use this.\\n\\n4. KEY LESSON (40-60 words)\\nEnd with \\\"The key lesson here is...\\\" - make it memorable and actionable.\\n\\n---\\n\\nARTICLE TO EXPLAIN:\\n\\nTitle: {{ $json.title }}\\n\\nContent:\\n{{ $json.content }}\"\n    }\n  ]\n}",
+        "options": {}
       },
       "id": "ai-simplify",
-      "name": "AI Simplify Article",
-      "type": "@n8n/n8n-nodes-langchain.openAi",
-      "typeVersion": 1.3,
-      "position": [1320, -100],
-      "credentials": {
-        "openAiApi": {
-          "id": "OPENAI_CREDENTIAL_ID",
-          "name": "OpenAI API"
-        }
-      }
+      "name": "Claude AI Simplify",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1320, -100]
     },
     {
       "parameters": {
-        "model": "tts-1",
-        "input": "={{ $json.message.content }}",
-        "voice": "nova",
-        "options": {}
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Extract the AI response text\nconst response = $input.first().json;\nconst explanation = response.content[0].text;\n\nreturn [{\n  json: {\n    explanation: explanation,\n    title: $('Extract Content').item.json.title,\n    link: $('Extract Content').item.json.link,\n    guid: $('Extract Content').item.json.guid\n  }\n}];"
+      },
+      "id": "parse-claude-response",
+      "name": "Parse Claude Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1540, -100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://tts-service:8100/synthesize",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"text\": {{ JSON.stringify($json.explanation) }},\n  \"voice\": \"en-US-AriaNeural\"\n}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
       },
       "id": "text-to-speech",
-      "name": "Text to Speech",
-      "type": "@n8n/n8n-nodes-langchain.openAi",
-      "typeVersion": 1.3,
-      "position": [1540, -100],
-      "credentials": {
-        "openAiApi": {
-          "id": "OPENAI_CREDENTIAL_ID",
-          "name": "OpenAI API"
-        }
-      }
+      "name": "Edge TTS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1760, -100]
     },
     {
       "parameters": {
@@ -139,31 +167,11 @@
         "binaryData": true,
         "binaryPropertyName": "data",
         "additionalFields": {
-          "caption": "=📚 *{{ $('Extract Content').item.json.title }}*\n\n🔗 [Read original]({{ $('Extract Content').item.json.link }})"
+          "caption": "=📚 *{{ $('Parse Claude Response').item.json.title }}*\n\n🔗 [Read original]({{ $('Parse Claude Response').item.json.link }})"
         }
       },
       "id": "send-audio",
       "name": "Send Audio to Telegram",
-      "type": "n8n-nodes-base.telegram",
-      "typeVersion": 1.1,
-      "position": [1760, -100],
-      "credentials": {
-        "telegramApi": {
-          "id": "TELEGRAM_CREDENTIAL_ID",
-          "name": "Telegram Bot"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
-        "text": "=📝 *Summary*\n\n{{ $('AI Simplify Article').item.json.message.content }}",
-        "additionalFields": {
-          "parse_mode": "Markdown"
-        }
-      },
-      "id": "send-summary",
-      "name": "Send Text Summary",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.1,
       "position": [1980, -100],
@@ -176,14 +184,34 @@
     },
     {
       "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "=📝 *Summary*\n\n{{ $('Parse Claude Response').item.json.explanation }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "send-summary",
+      "name": "Send Text Summary",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.1,
+      "position": [2200, -100],
+      "credentials": {
+        "telegramApi": {
+          "id": "TELEGRAM_CREDENTIAL_ID",
+          "name": "Telegram Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "// Save processed article to avoid duplicates\nconst fs = require('fs');\nconst path = '/home/node/data/processed_articles.json';\n\nlet processed = [];\ntry {\n  if (fs.existsSync(path)) {\n    processed = JSON.parse(fs.readFileSync(path, 'utf8'));\n  }\n} catch (e) {\n  processed = [];\n}\n\n// Add new article GUID\nconst guid = $('Extract Content').item.json.guid;\nif (!processed.includes(guid)) {\n  processed.push(guid);\n}\n\n// Keep only last 100 articles\nif (processed.length > 100) {\n  processed = processed.slice(-100);\n}\n\n// Ensure directory exists\nconst dir = '/home/node/data';\nif (!fs.existsSync(dir)) {\n  fs.mkdirSync(dir, { recursive: true });\n}\n\nfs.writeFileSync(path, JSON.stringify(processed, null, 2));\n\nreturn [{ json: { success: true, processed: processed.length } }];"
+        "jsCode": "// Save processed article to avoid duplicates\nconst fs = require('fs');\nconst path = '/home/node/data/processed_articles.json';\n\nlet processed = [];\ntry {\n  if (fs.existsSync(path)) {\n    processed = JSON.parse(fs.readFileSync(path, 'utf8'));\n  }\n} catch (e) {\n  processed = [];\n}\n\n// Add new article GUID\nconst guid = $('Parse Claude Response').item.json.guid;\nif (!processed.includes(guid)) {\n  processed.push(guid);\n}\n\n// Keep only last 100 articles\nif (processed.length > 100) {\n  processed = processed.slice(-100);\n}\n\n// Ensure directory exists\nconst dir = '/home/node/data';\nif (!fs.existsSync(dir)) {\n  fs.mkdirSync(dir, { recursive: true });\n}\n\nfs.writeFileSync(path, JSON.stringify(processed, null, 2));\n\nreturn [{ json: { success: true, processed: processed.length } }];"
       },
       "id": "log-processed",
       "name": "Log Processed Article",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2200, -100]
+      "position": [2420, -100]
     },
     {
       "parameters": {},
@@ -261,25 +289,36 @@
       "main": [
         [
           {
-            "node": "AI Simplify Article",
+            "node": "Claude AI Simplify",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "AI Simplify Article": {
+    "Claude AI Simplify": {
       "main": [
         [
           {
-            "node": "Text to Speech",
+            "node": "Parse Claude Response",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Text to Speech": {
+    "Parse Claude Response": {
+      "main": [
+        [
+          {
+            "node": "Edge TTS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edge TTS": {
       "main": [
         [
           {

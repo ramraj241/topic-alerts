@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   n8n:
     image: n8nio/n8n:latest
@@ -17,17 +15,35 @@ services:
       - NODE_ENV=production
       - WEBHOOK_URL=http://localhost:5678/
       - GENERIC_TIMEZONE=${TIMEZONE:-America/New_York}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
     volumes:
       - n8n_data:/home/node/.n8n
       - ./n8n-workflows:/home/node/workflows:ro
       - ./templates:/home/node/templates:ro
       - ./config:/home/node/config:ro
       - ./data:/home/node/data
+    depends_on:
+      - tts-service
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:5678/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  tts-service:
+    build:
+      context: ./services/tts
+      dockerfile: Dockerfile
+    container_name: ai-learning-agent-tts
+    restart: unless-stopped
+    ports:
+      - "8100:8100"
+    volumes:
+      - ./data/audio:/app/audio
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8100/health"]
       interval: 30s
       timeout: 10s
       retries: 3
