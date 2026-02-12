@@ -98,6 +98,13 @@
       transform: translateY(1px);
     }
 
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.6;
+      background: #6d7f85;
+      border-color: #6d7f85;
+    }
+
     .status {
       margin-top: 14px;
       border-radius: 10px;
@@ -124,6 +131,28 @@
       margin-top: 14px;
       font-size: 0.86rem;
       color: var(--muted);
+    }
+
+    .api-health {
+      margin-top: 14px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: #ffffff;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    .api-health.ok {
+      border-color: #bddfc8;
+      color: var(--ok-ink);
+      background: #f2fbf6;
+    }
+
+    .api-health.error {
+      border-color: #f1c9bf;
+      color: var(--err-ink);
+      background: #fff4f1;
     }
 
     .next-steps {
@@ -173,6 +202,7 @@
       <button type="submit">Subscribe On Telegram</button>
     </form>
 
+    <div id="apiHealth" class="api-health">API status: checking...</div>
     <div id="status" class="status" role="status" aria-live="polite"></div>
     <div id="nextSteps" class="next-steps" aria-live="polite">
       Telegram did not open automatically.
@@ -185,12 +215,32 @@
     <script>
     const form = document.getElementById("topicForm");
     const topicSelect = document.getElementById("topic");
+    const submitButton = form.querySelector("button[type='submit']");
+    const apiHealthEl = document.getElementById("apiHealth");
     const statusEl = document.getElementById("status");
     const nextStepsEl = document.getElementById("nextSteps");
     const telegramLinkEl = document.getElementById("telegramLink");
 
-    const API_BASE = window.TOPIC_ALERTS_API_BASE
-      || (window.location.protocol === "file:" ? "http://localhost:8200" : window.location.origin);
+    function resolveApiBase() {
+      if (window.TOPIC_ALERTS_API_BASE) {
+        return window.TOPIC_ALERTS_API_BASE;
+      }
+
+      if (window.location.protocol === "file:") {
+        return "http://localhost:8200";
+      }
+
+      const isLocalHost = ["localhost", "127.0.0.1"].includes(window.location.hostname);
+      const isApiPort = window.location.port === "8200";
+      if (isLocalHost && !isApiPort) {
+        return "http://localhost:8200";
+      }
+
+      return window.location.origin;
+    }
+
+    const API_BASE = resolveApiBase();
+    const HEALTH_API = `${API_BASE}/health`;
     const SUBSCRIBE_API = `${API_BASE}/api/telegram/subscribe`;
     const TOPICS_API = `${API_BASE}/api/telegram/topics`;
     const FALLBACK_TOPICS = [
@@ -199,6 +249,12 @@
       "cloud-architecture",
       "ai-tools"
     ];
+    let apiIsHealthy = false;
+
+    function setApiHealth(message, type) {
+      apiHealthEl.textContent = `API status: ${message}`;
+      apiHealthEl.className = `api-health ${type}`;
+    }
 
     function showStatus(message, type) {
       statusEl.textContent = message;
@@ -260,6 +316,23 @@
       });
     }
 
+    async function checkApiHealth() {
+      try {
+        const response = await fetch(HEALTH_API, { method: "GET" });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || data.status !== "healthy") {
+          throw new Error(data.detail || `HTTP ${response.status}`);
+        }
+        apiIsHealthy = true;
+        submitButton.disabled = false;
+        setApiHealth(`connected (${API_BASE})`, "ok");
+      } catch (error) {
+        apiIsHealthy = false;
+        submitButton.disabled = true;
+        setApiHealth(`offline (${API_BASE})`, "error");
+      }
+    }
+
     async function loadTopics() {
       try {
         const response = await fetch(TOPICS_API, { method: "GET" });
@@ -284,6 +357,10 @@
         showStatus("Please select a topic first.", "error");
         return;
       }
+      if (!apiIsHealthy) {
+        showStatus("API is not reachable. Start the service and refresh this page.", "error");
+        return;
+      }
 
       try {
         showStatus("Creating your Telegram subscribe link...", "ok");
@@ -294,9 +371,19 @@
           body: JSON.stringify({ topic })
         });
 
-        const data = await response.json().catch(() => ({}));
+        const raw = await response.text();
+        const data = (() => {
+          try {
+            return raw ? JSON.parse(raw) : {};
+          } catch {
+            return {};
+          }
+        })();
         if (!response.ok || !data.deep_link || !data.status_url) {
-          const detail = data.detail || "Subscription endpoint failed.";
+          const detail =
+            data.detail
+            || (raw ? raw.slice(0, 180) : "")
+            || `Subscription endpoint failed (HTTP ${response.status}).`;
           throw new Error(detail);
         }
 
@@ -312,7 +399,12 @@
       }
     });
 
-    loadTopics();
+    async function init() {
+      await checkApiHealth();
+      await loadTopics();
+    }
+
+    init();
   </script>
 </body>
 </html>
