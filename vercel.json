@@ -4,10 +4,10 @@
       "runtime": "python3.11"
     }
   },
-  "rewrites": [
+  "routes": [
     {
-      "source": "/api/(.*)",
-      "destination": "/api/index"
+      "src": "/api/(.*)",
+      "dest": "/api/index.py"
     }
   ]
 }
