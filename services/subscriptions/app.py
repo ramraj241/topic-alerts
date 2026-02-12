@@ -19,6 +19,7 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Any
 from urllib.error import HTTPError, URLError
+from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 from fastapi import FastAPI, Header, HTTPException, Request as FastAPIRequest
@@ -35,6 +36,15 @@ DATA_DIR = Path(os.getenv("SUBSCRIPTION_DATA_DIR", "/app/data/subscriptions"))
 PENDING_FILE = DATA_DIR / "pending_subscriptions.json"
 SUBSCRIPTIONS_FILE = DATA_DIR / "subscriptions.json"
 LINK_STATUS_FILE = DATA_DIR / "subscription_link_status.json"
+KV_REST_URL = (
+    os.getenv("KV_REST_API_URL", "").strip()
+    or os.getenv("UPSTASH_REDIS_REST_URL", "").strip()
+)
+KV_REST_TOKEN = (
+    os.getenv("KV_REST_API_TOKEN", "").strip()
+    or os.getenv("UPSTASH_REDIS_REST_TOKEN", "").strip()
+)
+KV_KEY_PREFIX = os.getenv("SUBSCRIPTION_STORAGE_PREFIX", "topic-alerts").strip()
 
 LINK_TTL_SECONDS = int(os.getenv("SUBSCRIPTION_LINK_TTL_SECONDS", "900"))
 LINK_STATUS_RETENTION_SECONDS = int(os.getenv("SUBSCRIPTION_LINK_STATUS_RETENTION_SECONDS", "86400"))
@@ -86,7 +96,45 @@ def _ensure_data_dir() -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 
+def _storage_key(path: Path) -> str:
+    return f"{KV_KEY_PREFIX}:{path.stem}"
+
+
+def _kv_request(command: str, *parts: str, body: bytes | None = None) -> dict[str, Any]:
+    if not KV_REST_URL or not KV_REST_TOKEN:
+        raise RuntimeError("KV REST URL/token not configured")
+
+    base = KV_REST_URL.rstrip("/")
+    encoded_parts = "/".join(quote(str(part), safe="") for part in parts)
+    url = f"{base}/{command}"
+    if encoded_parts:
+        url = f"{url}/{encoded_parts}"
+
+    headers = {"Authorization": f"Bearer {KV_REST_TOKEN}"}
+    if body is not None:
+        headers["Content-Type"] = "text/plain; charset=utf-8"
+    req = Request(url, data=body, headers=headers, method="POST" if body is not None else "GET")
+    with urlopen(req, timeout=10) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
 def _read_json(path: Path, default: Any) -> Any:
+    if KV_REST_URL and KV_REST_TOKEN:
+        key = _storage_key(path)
+        try:
+            payload = _kv_request("get", key)
+        except Exception:
+            return default
+        raw = payload.get("result")
+        if raw is None:
+            return default
+        if isinstance(raw, str):
+            try:
+                return json.loads(raw)
+            except json.JSONDecodeError:
+                return default
+        return raw
+
     if not path.exists():
         return default
     with path.open("r", encoding="utf-8") as f:
@@ -94,6 +142,14 @@ def _read_json(path: Path, default: Any) -> Any:
 
 
 def _write_json_atomic(path: Path, payload: Any) -> None:
+    if KV_REST_URL and KV_REST_TOKEN:
+        key = _storage_key(path)
+        serialized = json.dumps(payload, ensure_ascii=True, sort_keys=True)
+        result = _kv_request("set", key, body=serialized.encode("utf-8"))
+        if result.get("error"):
+            raise RuntimeError(f"KV set failed: {result['error']}")
+        return
+
     _ensure_data_dir()
     with NamedTemporaryFile("w", encoding="utf-8", delete=False, dir=DATA_DIR) as tmp:
         json.dump(payload, tmp, ensure_ascii=True, indent=2, sort_keys=True)
@@ -232,7 +288,8 @@ def _save_chat_topics(subs: dict[str, Any], chat_id: int, topics_for_chat: set[s
 
 @app.on_event("startup")
 def startup() -> None:
-    _ensure_data_dir()
+    if not (KV_REST_URL and KV_REST_TOKEN):
+        _ensure_data_dir()
 
 
 @app.get("/health")
@@ -243,7 +300,13 @@ def health() -> dict[str, Any]:
         "bot_username_configured": bool(BOT_USERNAME),
         "bot_token_configured": bool(BOT_TOKEN),
         "topics_count": len(DEFAULT_TOPICS),
+        "storage_mode": "kv_rest" if (KV_REST_URL and KV_REST_TOKEN) else "local_file",
     }
+
+
+@app.get("/api/health")
+def api_health() -> dict[str, Any]:
+    return health()
 
 
 @app.get("/api/telegram/topics")

@@ -257,6 +257,12 @@ python scripts/set_telegram_webhook.py
 curl http://localhost:8200/health
 ```
 
+For Vercel (same frontend + API domain), verify:
+
+```bash
+curl https://your-domain.vercel.app/api/health
+```
+
 5. Open `docs/telegram-subscribe.html`, choose a topic, and confirm via Telegram.
    - The page now waits for confirmation and shows success automatically once `/start subscribe_*` is processed by the webhook.
 
@@ -273,3 +279,20 @@ curl -X POST "http://localhost:8200/api/telegram/topics/data-engineering/notify"
   -H "Content-Type: application/json" \
   -d "{\"text\":\"New data-engineering digest is ready\"}"
 ```
+
+## Vercel same-domain deployment notes
+
+When deploying `services/subscriptions/app.py` on Vercel, do not use local file storage for subscriptions.
+Set these environment variables in Vercel:
+
+- `KV_REST_API_URL`
+- `KV_REST_API_TOKEN`
+- `TELEGRAM_BOT_TOKEN`
+- `TELEGRAM_BOT_USERNAME` (optional)
+- `TELEGRAM_WEBHOOK_SECRET`
+- `TELEGRAM_SUBSCRIPTION_TOPICS`
+- `TELEGRAM_SUBSCRIPTION_CORS_ORIGINS=https://topic-alerts.vercel.app`
+
+Webhook URL for Telegram:
+
+`https://topic-alerts.vercel.app/api/telegram/webhook`

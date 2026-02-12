@@ -191,6 +191,8 @@ Subscription state is persisted in `data/subscriptions/`:
 - `pending_subscriptions.json`
 - `subscriptions.json`
 
+For serverless deployments (like Vercel), set `KV_REST_API_URL` and `KV_REST_API_TOKEN` to use persistent Redis storage (Upstash/Vercel KV) instead of local files.
+
 ### Bot commands for subscribers
 
 - `/topics` - list active topic subscriptions.
@@ -221,3 +223,25 @@ Example payload:
   "disable_web_page_preview": true
 }
 ```
+
+### Deploying Frontend + API on the same Vercel domain
+
+This repo includes Vercel Python function entrypoints:
+
+- `api/index.py`
+- `api/[...all].py`
+
+Set these Vercel environment variables:
+
+- `TELEGRAM_BOT_TOKEN`
+- `TELEGRAM_BOT_USERNAME` (optional if token can resolve username)
+- `TELEGRAM_WEBHOOK_SECRET`
+- `TELEGRAM_SUBSCRIPTION_TOPICS`
+- `TELEGRAM_SUBSCRIPTION_CORS_ORIGINS=https://topic-alerts.vercel.app`
+- `KV_REST_API_URL`
+- `KV_REST_API_TOKEN`
+- `SUBSCRIPTION_STORAGE_PREFIX` (optional)
+
+Then set Telegram webhook to:
+
+`https://<your-vercel-domain>/api/telegram/webhook`
