@@ -32,7 +32,7 @@ app = FastAPI(title="Telegram Topic Subscription API", version="1.0.0")
 TOPIC_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]{1,49}$")
 START_PREFIX = "subscribe_"
 
-DATA_DIR = Path(os.getenv("SUBSCRIPTION_DATA_DIR", "/app/data/subscriptions"))
+DATA_DIR = Path(os.getenv("SUBSCRIPTION_DATA_DIR", "/tmp/subscriptions"))
 PENDING_FILE = DATA_DIR / "pending_subscriptions.json"
 SUBSCRIPTIONS_FILE = DATA_DIR / "subscriptions.json"
 LINK_STATUS_FILE = DATA_DIR / "subscription_link_status.json"
