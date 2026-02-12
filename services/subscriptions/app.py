@@ -46,8 +46,22 @@ KV_REST_TOKEN = (
 )
 KV_KEY_PREFIX = os.getenv("SUBSCRIPTION_STORAGE_PREFIX", "topic-alerts").strip()
 
-LINK_TTL_SECONDS = int(os.getenv("SUBSCRIPTION_LINK_TTL_SECONDS", "900"))
-LINK_STATUS_RETENTION_SECONDS = int(os.getenv("SUBSCRIPTION_LINK_STATUS_RETENTION_SECONDS", "86400"))
+
+def _env_int(name: str, default: int) -> int:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    clean = raw.strip()
+    if not clean:
+        return default
+    try:
+        return int(clean)
+    except ValueError:
+        return default
+
+
+LINK_TTL_SECONDS = _env_int("SUBSCRIPTION_LINK_TTL_SECONDS", 900)
+LINK_STATUS_RETENTION_SECONDS = _env_int("SUBSCRIPTION_LINK_STATUS_RETENTION_SECONDS", 86400)
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 BOT_USERNAME = os.getenv("TELEGRAM_BOT_USERNAME", "").strip().lstrip("@").lower()
 WEBHOOK_SECRET = os.getenv("TELEGRAM_WEBHOOK_SECRET", "").strip()
