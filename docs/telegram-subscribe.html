@@ -105,6 +105,20 @@
       border-color: #6d7f85;
     }
 
+    .button-content {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .telegram-icon {
+      width: 18px;
+      height: 18px;
+      flex: 0 0 auto;
+      fill: currentColor;
+    }
+
     .status {
       margin-top: 14px;
       border-radius: 10px;
@@ -171,7 +185,14 @@
         <option value="">Choose a topic</option>
       </select>
 
-      <button type="submit">Subscribe On Telegram</button>
+      <button type="submit" aria-label="Subscribe to Telegram">
+        <span class="button-content">
+          <svg class="telegram-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M9.18 15.31 8.8 20.68c.54 0 .78-.23 1.06-.51l2.55-2.44 5.28 3.86c.97.54 1.65.26 1.91-.9l3.46-16.2h0c.31-1.45-.52-2.01-1.47-1.66L1.2 10.68c-1.4.54-1.38 1.32-.24 1.67l5.2 1.62L18.24 6.3c.57-.37 1.09-.16.66.21"/>
+          </svg>
+          <span>Subscribe to Telegram</span>
+        </span>
+      </button>
     </form>
 
     <div id="status" class="status" role="status" aria-live="polite"></div>
