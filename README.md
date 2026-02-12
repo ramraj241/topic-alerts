@@ -1,14 +1,14 @@
-# AI Learning Agent for Medium
+﻿# AI Learning Agent for Medium
 
 Automated pipeline that transforms Medium Data Engineering articles into beginner-friendly audio explanations, delivered daily via Telegram.
 
 ## Architecture
 
 ```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│  Medium RSS     │────▶│  AI Simplifier  │────▶│  Text-to-Speech │────▶│  Telegram Bot   │
-│  (Data Eng)     │     │  (Claude/GPT)   │     │  (OpenAI TTS)   │     │  (Daily 7 AM)   │
-└─────────────────┘     └─────────────────┘     └─────────────────┘     └─────────────────┘
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”     â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”     â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”     â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚  Medium RSS     â”‚â”€â”€â”€â”€â–¶â”‚  AI Simplifier  â”‚â”€â”€â”€â”€â–¶â”‚  Text-to-Speech â”‚â”€â”€â”€â”€â–¶â”‚  Telegram Bot   â”‚
+â”‚  (Data Eng)     â”‚     â”‚  (Claude/GPT)   â”‚     â”‚  (OpenAI TTS)   â”‚     â”‚  (Daily 7 AM)   â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜     â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜     â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜     â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
 ```
 
 ## Features
@@ -66,7 +66,7 @@ docker-compose up -d
 ### 4. Import n8n Workflow
 
 1. Open n8n at `http://localhost:5678`
-2. Go to Workflows → Import from File
+2. Go to Workflows â†’ Import from File
 3. Select `n8n-workflows/medium-to-audio-workflow.json`
 4. Configure credentials (OpenAI, Telegram)
 5. Activate the workflow
@@ -100,20 +100,20 @@ Edit `config/feeds.json` to add sources:
 
 ```
 ai-learning-agent-for-medium/
-├── docker-compose.yml      # n8n container setup
-├── .env.example            # Environment template
-├── config/
-│   ├── feeds.json          # RSS feed sources
-│   └── settings.json       # App configuration
-├── n8n-workflows/
-│   └── medium-to-audio-workflow.json
-├── scripts/
-│   ├── fetch_article.py    # Custom article parser
-│   └── test_telegram.py    # Bot testing utility
-├── templates/
-│   └── explanation_prompt.txt
-└── docs/
-    └── setup-guide.md
+â”œâ”€â”€ docker-compose.yml      # n8n container setup
+â”œâ”€â”€ .env.example            # Environment template
+â”œâ”€â”€ config/
+â”‚   â”œâ”€â”€ feeds.json          # RSS feed sources
+â”‚   â””â”€â”€ settings.json       # App configuration
+â”œâ”€â”€ n8n-workflows/
+â”‚   â””â”€â”€ medium-to-audio-workflow.json
+â”œâ”€â”€ scripts/
+â”‚   â”œâ”€â”€ fetch_article.py    # Custom article parser
+â”‚   â””â”€â”€ test_telegram.py    # Bot testing utility
+â”œâ”€â”€ templates/
+â”‚   â””â”€â”€ explanation_prompt.txt
+â””â”€â”€ docs/
+    â””â”€â”€ setup-guide.md
 ```
 
 ## Workflow Details
@@ -157,3 +157,67 @@ Monthly (30 articles): **~$0.50**
 ## License
 
 MIT - Use freely for personal learning.
+
+## Telegram Topic Subscriptions
+
+This repo now includes an API service for per-topic Telegram subscriptions.
+
+### What it provides
+
+- `POST /api/telegram/subscribe` - creates a one-time deep link for a topic.
+- `GET /api/telegram/subscribe/{start_param}/status` - checks whether the Telegram `/start` confirmation completed.
+- `POST /api/telegram/webhook` - receives Telegram updates and confirms subscriptions.
+- `GET /api/telegram/topics` - lists topics shown in the subscribe form.
+- `GET /api/telegram/topics/{topic}/chat-ids` - returns chat IDs subscribed to a topic.
+- `POST /api/telegram/topics/{topic}/notify` - sends an alert (text/audio) to all subscribers for a topic.
+- `GET /api/telegram/subscriptions` - inspect stored subscriptions.
+
+### Start the service
+
+`docker-compose up -d telegram-subscriptions`
+
+By default, the API is available at `http://localhost:8200`.
+
+### Configure webhook
+
+Telegram requires a public HTTPS webhook URL. Set `TELEGRAM_SUBSCRIPTION_WEBHOOK_URL` in `.env`, then run:
+
+`python scripts/set_telegram_webhook.py`
+
+### Data storage
+
+Subscription state is persisted in `data/subscriptions/`:
+
+- `pending_subscriptions.json`
+- `subscriptions.json`
+
+### Bot commands for subscribers
+
+- `/topics` - list active topic subscriptions.
+- `/unsubscribe <topic>` - remove one topic.
+- `/unsubscribe_all` - remove all topic subscriptions.
+
+### Browser flow behavior
+
+`docs/telegram-subscribe.html` now polls the status endpoint after opening Telegram and shows a success message as soon as the user taps **Start** in the bot.
+
+### Triggering topic delivery from your workflow
+
+Call this endpoint after generating your summary/audio:
+
+`POST http://localhost:8200/api/telegram/topics/<topic>/notify`
+
+The included workflow file now has a `Notify Topic Subscribers` HTTP node that posts to:
+`http://telegram-subscriptions:8200/api/telegram/topics/data-engineering/notify`
+Update the topic slug in that node if you run separate workflows per topic.
+
+Example payload:
+
+```json
+{
+  "text": "New article: Building reliable Airflow DAGs...",
+  "audio_url": "https://your-public-host/audio/airflow-2026-02-12.mp3",
+  "caption": "3-minute explanation",
+  "disable_web_page_preview": true
+}
+```

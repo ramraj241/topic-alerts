@@ -1,4 +1,4 @@
-# Setup Guide
+﻿# Setup Guide
 
 Complete step-by-step guide to set up the AI Learning Agent for Medium.
 
@@ -83,7 +83,7 @@ Wait about 30 seconds for n8n to fully start.
 
 ### OpenAI Credentials
 
-1. In n8n, go to **Settings** → **Credentials**
+1. In n8n, go to **Settings** â†’ **Credentials**
 2. Click **Add Credential**
 3. Search for "OpenAI"
 4. Enter your API key
@@ -99,7 +99,7 @@ Wait about 30 seconds for n8n to fully start.
 ## Step 7: Import the Workflow
 
 1. Go to **Workflows** in the left menu
-2. Click the **...** menu → **Import from File**
+2. Click the **...** menu â†’ **Import from File**
 3. Select `n8n-workflows/medium-to-audio-workflow.json`
 4. Click **Import**
 
@@ -228,3 +228,48 @@ Expected costs:
 - GPT-4o-mini: ~$0.003/article
 - TTS-1: ~$0.012/article
 - **Total: ~$0.50/month** for daily articles
+
+## Step 11: Configure Topic Subscription Webhook
+
+The topic subscribe page needs Telegram webhook delivery to complete `/start subscribe_*` confirmations.
+
+1. Set these values in `.env`:
+   - `TELEGRAM_BOT_USERNAME` (without `@`, optional if token is valid)
+   - `TELEGRAM_WEBHOOK_SECRET` (optional but recommended)
+   - `TELEGRAM_SUBSCRIPTION_TOPICS` (comma-separated topic slugs shown in the form)
+   - `TELEGRAM_SUBSCRIPTION_CORS_ORIGINS` (for example `http://localhost:5500`)
+   - `TELEGRAM_SUBSCRIPTION_WEBHOOK_URL` (public HTTPS URL ending with `/api/telegram/webhook`)
+2. Start the API service:
+
+```bash
+docker-compose up -d telegram-subscriptions
+```
+
+3. Register webhook with Telegram:
+
+```bash
+python scripts/set_telegram_webhook.py
+```
+
+4. Verify health:
+
+```bash
+curl http://localhost:8200/health
+```
+
+5. Open `docs/telegram-subscribe.html`, choose a topic, and confirm via Telegram.
+   - The page now waits for confirmation and shows success automatically once `/start subscribe_*` is processed by the webhook.
+
+After subscribing, users can manage subscriptions in bot chat:
+
+- `/topics`
+- `/unsubscribe <topic>`
+- `/unsubscribe_all`
+
+To deliver alerts to topic subscribers from n8n or another service:
+
+```bash
+curl -X POST "http://localhost:8200/api/telegram/topics/data-engineering/notify" \
+  -H "Content-Type: application/json" \
+  -d "{\"text\":\"New data-engineering digest is ready\"}"
+```

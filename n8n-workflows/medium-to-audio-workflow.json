@@ -214,6 +214,30 @@
       "position": [2420, -100]
     },
     {
+      "parameters": {
+        "method": "POST",
+        "url": "http://telegram-subscriptions:8200/api/telegram/topics/data-engineering/notify",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"text\": \"New article: \" + $('Parse Claude Response').item.json.title + \"\\n\\n\" + $('Parse Claude Response').item.json.explanation + \"\\n\\nRead original: \" + $('Parse Claude Response').item.json.link,\n  \"disable_web_page_preview\": false\n}",
+        "options": {}
+      },
+      "id": "notify-topic-subscribers",
+      "name": "Notify Topic Subscribers",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1760, 120]
+    },
+    {
       "parameters": {},
       "id": "no-op",
       "name": "No New Articles",
@@ -312,6 +336,13 @@
         [
           {
             "node": "Edge TTS",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify Topic Subscribers",
             "type": "main",
             "index": 0
           }

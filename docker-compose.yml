@@ -48,6 +48,31 @@ services:
       timeout: 10s
       retries: 3
 
+  telegram-subscriptions:
+    build:
+      context: ./services/subscriptions
+      dockerfile: Dockerfile
+    container_name: ai-learning-agent-subscriptions
+    restart: unless-stopped
+    ports:
+      - "8200:8200"
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_BOT_USERNAME=${TELEGRAM_BOT_USERNAME}
+      - TELEGRAM_WEBHOOK_SECRET=${TELEGRAM_WEBHOOK_SECRET}
+      - SUBSCRIPTION_LINK_TTL_SECONDS=${SUBSCRIPTION_LINK_TTL_SECONDS:-900}
+      - SUBSCRIPTION_LINK_STATUS_RETENTION_SECONDS=${SUBSCRIPTION_LINK_STATUS_RETENTION_SECONDS:-86400}
+      - TELEGRAM_SUBSCRIPTION_TOPICS=${TELEGRAM_SUBSCRIPTION_TOPICS:-data-engineering,machine-learning,cloud-architecture,ai-tools}
+      - TELEGRAM_SUBSCRIPTION_CORS_ORIGINS=${TELEGRAM_SUBSCRIPTION_CORS_ORIGINS:-*}
+      - SUBSCRIPTION_DATA_DIR=/app/data/subscriptions
+    volumes:
+      - ./data/subscriptions:/app/data/subscriptions
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8200/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 volumes:
   n8n_data:
     driver: local
+

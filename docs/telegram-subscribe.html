@@ -126,6 +126,28 @@
       color: var(--muted);
     }
 
+    .next-steps {
+      margin-top: 14px;
+      display: none;
+      padding: 12px;
+      border: 1px dashed var(--line);
+      border-radius: 10px;
+      background: #ffffff;
+      color: var(--ink);
+      font-size: 0.92rem;
+      line-height: 1.45;
+    }
+
+    .next-steps.show {
+      display: block;
+    }
+
+    .next-steps a {
+      color: var(--brand-strong);
+      font-weight: 700;
+      text-decoration: none;
+    }
+
     @media (max-width: 480px) {
       .card {
         padding: 22px;
@@ -146,35 +168,117 @@
       <label for="topic">Topic</label>
       <select id="topic" name="topic" required>
         <option value="">Choose a topic</option>
-        <option value="data-engineering">Data Engineering</option>
-        <option value="machine-learning">Machine Learning</option>
-        <option value="cloud-architecture">Cloud Architecture</option>
-        <option value="ai-tools">AI Tools</option>
       </select>
 
       <button type="submit">Subscribe On Telegram</button>
     </form>
 
     <div id="status" class="status" role="status" aria-live="polite"></div>
-    <div class="hint">Set your Telegram bot username in the script before publishing.</div>
+    <div id="nextSteps" class="next-steps" aria-live="polite">
+      Telegram did not open automatically.
+      <a id="telegramLink" href="#" target="_blank" rel="noopener noreferrer">Open Telegram manually</a>
+      and tap Start to finish subscribing.
+    </div>
+    <div class="hint">Configure TOPIC_ALERTS_API_BASE to your API URL if not running on localhost:8200.</div>
   </main>
 
-  <script>
+    <script>
     const form = document.getElementById("topicForm");
     const topicSelect = document.getElementById("topic");
     const statusEl = document.getElementById("status");
+    const nextStepsEl = document.getElementById("nextSteps");
+    const telegramLinkEl = document.getElementById("telegramLink");
 
-    const TELEGRAM_BOT_USERNAME = "your_bot_username";
-    const SUBSCRIBE_API = "/api/telegram/subscribe";
+    const API_BASE = window.TOPIC_ALERTS_API_BASE
+      || (window.location.protocol === "file:" ? "http://localhost:8200" : window.location.origin);
+    const SUBSCRIBE_API = `${API_BASE}/api/telegram/subscribe`;
+    const TOPICS_API = `${API_BASE}/api/telegram/topics`;
+    const FALLBACK_TOPICS = [
+      "data-engineering",
+      "machine-learning",
+      "cloud-architecture",
+      "ai-tools"
+    ];
 
     function showStatus(message, type) {
       statusEl.textContent = message;
       statusEl.className = `status show ${type}`;
     }
 
+    function showNextSteps(link) {
+      telegramLinkEl.href = link;
+      nextStepsEl.classList.add("show");
+    }
+
+    async function pollSubscriptionStatus(statusUrl, topic, timeoutMs = 90000) {
+      const start = Date.now();
+      while (Date.now() - start < timeoutMs) {
+        const response = await fetch(statusUrl, { method: "GET" });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(data.detail || "Could not verify Telegram confirmation.");
+        }
+
+        if (data.status === "confirmed") {
+          showStatus(`Subscribed successfully to ${labelForTopic(topic)}.`, "ok");
+          nextStepsEl.classList.remove("show");
+          return;
+        }
+        if (data.status === "expired") {
+          throw new Error("This link expired. Please generate a new one.");
+        }
+        if (data.status === "invalid") {
+          throw new Error("Subscription link is invalid. Please try again.");
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
+      showStatus("Waiting for Telegram confirmation. Tap Start in Telegram if prompted.", "ok");
+    }
+
+    function labelForTopic(topic) {
+      return topic
+        .split("-")
+        .filter(Boolean)
+        .map((part) => part[0].toUpperCase() + part.slice(1))
+        .join(" ");
+    }
+
+    function setTopics(topics) {
+      topicSelect.innerHTML = "";
+
+      const placeholder = document.createElement("option");
+      placeholder.value = "";
+      placeholder.textContent = "Choose a topic";
+      topicSelect.appendChild(placeholder);
+
+      topics.forEach((topic) => {
+        const option = document.createElement("option");
+        option.value = topic;
+        option.textContent = labelForTopic(topic);
+        topicSelect.appendChild(option);
+      });
+    }
+
+    async function loadTopics() {
+      try {
+        const response = await fetch(TOPICS_API, { method: "GET" });
+        const data = await response.json().catch(() => ({}));
+        const topics = Array.isArray(data.topics) ? data.topics : [];
+        if (!response.ok || topics.length === 0) {
+          throw new Error(data.detail || "Could not load topics");
+        }
+        setTopics(topics);
+      } catch (error) {
+        setTopics(FALLBACK_TOPICS);
+        showStatus(`Using default topics (${error.message}).`, "error");
+      }
+    }
+
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       const topic = topicSelect.value;
+      nextStepsEl.classList.remove("show");
 
       if (!topic) {
         showStatus("Please select a topic first.", "error");
@@ -182,25 +286,35 @@
       }
 
       try {
+        showStatus("Creating your Telegram subscribe link...", "ok");
+
         const response = await fetch(SUBSCRIBE_API, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ topic })
         });
 
-        if (!response.ok) {
-          throw new Error("Subscription endpoint failed.");
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.deep_link || !data.status_url) {
+          const detail = data.detail || "Subscription endpoint failed.";
+          throw new Error(detail);
         }
 
-        showStatus("Topic saved. Opening Telegram...", "ok");
+        showStatus("Opening Telegram to confirm subscription...", "ok");
+        const statusUrl = new URL(data.status_url, API_BASE).toString();
+        const popup = window.open(data.deep_link, "_blank", "noopener,noreferrer");
+        if (!popup) {
+          showNextSteps(data.deep_link);
+        }
+        await pollSubscriptionStatus(statusUrl, topic);
       } catch (error) {
-        // Allow client-side flow even when backend is not wired yet.
-        showStatus("Opening Telegram. Backend confirmation is not connected yet.", "ok");
+        showStatus(`Could not create Telegram link: ${error.message}`, "error");
       }
-
-      const deepLink = `https://t.me/${TELEGRAM_BOT_USERNAME}?start=subscribe_${encodeURIComponent(topic)}`;
-      window.open(deepLink, "_blank", "noopener,noreferrer");
     });
+
+    loadTopics();
   </script>
 </body>
 </html>
+
+
