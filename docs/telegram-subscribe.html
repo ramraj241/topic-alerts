@@ -127,34 +127,6 @@
       color: var(--err-ink);
     }
 
-    .hint {
-      margin-top: 14px;
-      font-size: 0.86rem;
-      color: var(--muted);
-    }
-
-    .api-health {
-      margin-top: 14px;
-      padding: 10px 12px;
-      border-radius: 10px;
-      border: 1px solid var(--line);
-      background: #ffffff;
-      font-size: 0.9rem;
-      color: var(--muted);
-    }
-
-    .api-health.ok {
-      border-color: #bddfc8;
-      color: var(--ok-ink);
-      background: #f2fbf6;
-    }
-
-    .api-health.error {
-      border-color: #f1c9bf;
-      color: var(--err-ink);
-      background: #fff4f1;
-    }
-
     .next-steps {
       margin-top: 14px;
       display: none;
@@ -202,21 +174,17 @@
       <button type="submit">Subscribe On Telegram</button>
     </form>
 
-    <div id="apiHealth" class="api-health">API status: checking...</div>
     <div id="status" class="status" role="status" aria-live="polite"></div>
     <div id="nextSteps" class="next-steps" aria-live="polite">
       Telegram did not open automatically.
       <a id="telegramLink" href="#" target="_blank" rel="noopener noreferrer">Open Telegram manually</a>
       and tap Start to finish subscribing.
     </div>
-    <div class="hint">Configure TOPIC_ALERTS_API_BASE to your API URL if not running on localhost:8200.</div>
   </main>
 
     <script>
     const form = document.getElementById("topicForm");
     const topicSelect = document.getElementById("topic");
-    const submitButton = form.querySelector("button[type='submit']");
-    const apiHealthEl = document.getElementById("apiHealth");
     const statusEl = document.getElementById("status");
     const nextStepsEl = document.getElementById("nextSteps");
     const telegramLinkEl = document.getElementById("telegramLink");
@@ -252,11 +220,6 @@
     ];
     let apiIsHealthy = false;
     let pollInProgress = false;
-
-    function setApiHealth(message, type) {
-      apiHealthEl.textContent = `API status: ${message}`;
-      apiHealthEl.className = `api-health ${type}`;
-    }
 
     function showStatus(message, type) {
       statusEl.textContent = message;
@@ -374,12 +337,8 @@
           throw new Error(data.detail || `HTTP ${response.status}`);
         }
         apiIsHealthy = true;
-        submitButton.disabled = false;
-        setApiHealth(`connected (${API_BASE})`, "ok");
       } catch (error) {
         apiIsHealthy = false;
-        submitButton.disabled = true;
-        setApiHealth(`offline (${API_BASE})`, "error");
       }
     }
 
@@ -394,7 +353,6 @@
         setTopics(topics);
       } catch (error) {
         setTopics(FALLBACK_TOPICS);
-        showStatus(`Using default topics (${error.message}).`, "error");
       }
     }
 
