@@ -243,6 +243,7 @@
     const HEALTH_API = `${API_BASE}/api/health`;
     const SUBSCRIBE_API = `${API_BASE}/api/telegram/subscribe`;
     const TOPICS_API = `${API_BASE}/api/telegram/topics`;
+    const PENDING_SUBSCRIBE_KEY = "topicAlertsPendingSubscribe";
     const FALLBACK_TOPICS = [
       "data-engineering",
       "machine-learning",
@@ -250,6 +251,7 @@
       "ai-tools"
     ];
     let apiIsHealthy = false;
+    let pollInProgress = false;
 
     function setApiHealth(message, type) {
       apiHealthEl.textContent = `API status: ${message}`;
@@ -266,6 +268,30 @@
       nextStepsEl.classList.add("show");
     }
 
+    function savePendingSubscription(payload) {
+      sessionStorage.setItem(PENDING_SUBSCRIBE_KEY, JSON.stringify(payload));
+    }
+
+    function loadPendingSubscription() {
+      const raw = sessionStorage.getItem(PENDING_SUBSCRIBE_KEY);
+      if (!raw) {
+        return null;
+      }
+      try {
+        const parsed = JSON.parse(raw);
+        if (!parsed || !parsed.statusUrl || !parsed.topic || !parsed.deepLink) {
+          return null;
+        }
+        return parsed;
+      } catch {
+        return null;
+      }
+    }
+
+    function clearPendingSubscription() {
+      sessionStorage.removeItem(PENDING_SUBSCRIBE_KEY);
+    }
+
     async function pollSubscriptionStatus(statusUrl, topic, timeoutMs = 90000) {
       const start = Date.now();
       while (Date.now() - start < timeoutMs) {
@@ -276,20 +302,44 @@
         }
 
         if (data.status === "confirmed") {
+          clearPendingSubscription();
           showStatus(`Subscribed successfully to ${labelForTopic(topic)}.`, "ok");
           nextStepsEl.classList.remove("show");
           return;
         }
         if (data.status === "expired") {
+          clearPendingSubscription();
           throw new Error("This link expired. Please generate a new one.");
         }
         if (data.status === "invalid") {
+          clearPendingSubscription();
           throw new Error("Subscription link is invalid. Please try again.");
         }
 
         await new Promise((resolve) => setTimeout(resolve, 2000));
       }
       showStatus("Waiting for Telegram confirmation. Tap Start in Telegram if prompted.", "ok");
+    }
+
+    async function resumePendingSubscription() {
+      if (pollInProgress || !apiIsHealthy) {
+        return;
+      }
+      const pending = loadPendingSubscription();
+      if (!pending) {
+        return;
+      }
+
+      showStatus("Waiting for Telegram confirmation...", "ok");
+      showNextSteps(pending.deepLink);
+      pollInProgress = true;
+      try {
+        await pollSubscriptionStatus(pending.statusUrl, pending.topic, 30000);
+      } catch (error) {
+        showStatus(`Could not confirm Telegram subscription: ${error.message}`, "error");
+      } finally {
+        pollInProgress = false;
+      }
     }
 
     function labelForTopic(topic) {
@@ -389,11 +439,14 @@
 
         showStatus("Opening Telegram to confirm subscription...", "ok");
         const statusUrl = new URL(data.status_url, API_BASE).toString();
-        const popup = window.open(data.deep_link, "_blank", "noopener,noreferrer");
-        if (!popup) {
-          showNextSteps(data.deep_link);
-        }
-        await pollSubscriptionStatus(statusUrl, topic);
+        savePendingSubscription({
+          statusUrl,
+          topic,
+          deepLink: data.deep_link,
+          createdAt: Date.now()
+        });
+        showNextSteps(data.deep_link);
+        window.location.assign(data.deep_link);
       } catch (error) {
         showStatus(`Could not create Telegram link: ${error.message}`, "error");
       }
@@ -402,7 +455,15 @@
     async function init() {
       await checkApiHealth();
       await loadTopics();
+      await resumePendingSubscription();
     }
+
+    window.addEventListener("focus", resumePendingSubscription);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") {
+        resumePendingSubscription();
+      }
+    });
 
     init();
   </script>
