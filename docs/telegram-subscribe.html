@@ -59,6 +59,37 @@
       line-height: 1.45;
     }
 
+    .progress {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin: 0 0 18px;
+    }
+
+    .progress-step {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-size: 0.82rem;
+      color: var(--muted);
+      background: #ffffff;
+      text-align: center;
+      line-height: 1.3;
+    }
+
+    .progress-step.active {
+      border-color: #7fc3aa;
+      background: #ecf8f2;
+      color: var(--ok-ink);
+      font-weight: 700;
+    }
+
+    .progress-step.completed {
+      border-color: #bddfc8;
+      background: #f2fbf6;
+      color: var(--ok-ink);
+    }
+
     label {
       display: block;
       font-weight: 600;
@@ -163,6 +194,54 @@
       text-decoration: none;
     }
 
+    .meta-card {
+      margin-top: 14px;
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: #ffffff;
+      font-size: 0.9rem;
+      color: var(--ink);
+      display: none;
+    }
+
+    .meta-card.show {
+      display: block;
+    }
+
+    .meta-title {
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .meta-row {
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .action-btn {
+      border: 1px solid var(--line);
+      background: #ffffff;
+      color: var(--ink);
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-size: 0.84rem;
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    .action-btn:hover {
+      border-color: #9eb4bd;
+    }
+
     @media (max-width: 480px) {
       .card {
         padding: 22px;
@@ -178,6 +257,11 @@
   <main class="card">
     <h1>Subscribe To Topic Alerts</h1>
     <p>Select a topic and continue in Telegram to receive notifications.</p>
+    <div class="progress" aria-label="Subscription progress">
+      <div class="progress-step active" data-step="1">1. Choose Topic</div>
+      <div class="progress-step" data-step="2">2. Open Telegram</div>
+      <div class="progress-step" data-step="3">3. Confirmed</div>
+    </div>
 
     <form id="topicForm">
       <label for="topic">Topic</label>
@@ -201,14 +285,34 @@
       <a id="telegramLink" href="#" target="_blank" rel="noopener noreferrer">Open Telegram manually</a>
       and tap Start to finish subscribing.
     </div>
+    <div id="lastSubscription" class="meta-card" aria-live="polite">
+      <div class="meta-title">Last Subscription</div>
+      <div id="lastSubscriptionText" class="meta-row"></div>
+    </div>
+    <div id="manageCard" class="meta-card" aria-live="polite">
+      <div class="meta-title">Manage in Telegram</div>
+      <div class="meta-row">Open the bot and use quick commands.</div>
+      <div class="actions">
+        <a id="openBotLink" class="action-btn" href="#" target="_blank" rel="noopener noreferrer">Open Bot Chat</a>
+        <button id="topicsCmdBtn" type="button" class="action-btn">Copy /topics</button>
+        <button id="unsubscribeAllCmdBtn" type="button" class="action-btn">Copy /unsubscribe_all</button>
+      </div>
+    </div>
   </main>
 
     <script>
     const form = document.getElementById("topicForm");
     const topicSelect = document.getElementById("topic");
+    const progressSteps = Array.from(document.querySelectorAll(".progress-step"));
     const statusEl = document.getElementById("status");
     const nextStepsEl = document.getElementById("nextSteps");
     const telegramLinkEl = document.getElementById("telegramLink");
+    const lastSubscriptionEl = document.getElementById("lastSubscription");
+    const lastSubscriptionTextEl = document.getElementById("lastSubscriptionText");
+    const manageCardEl = document.getElementById("manageCard");
+    const openBotLinkEl = document.getElementById("openBotLink");
+    const topicsCmdBtn = document.getElementById("topicsCmdBtn");
+    const unsubscribeAllCmdBtn = document.getElementById("unsubscribeAllCmdBtn");
 
     function resolveApiBase() {
       if (window.TOPIC_ALERTS_API_BASE) {
@@ -233,6 +337,7 @@
     const SUBSCRIBE_API = `${API_BASE}/api/telegram/subscribe`;
     const TOPICS_API = `${API_BASE}/api/telegram/topics`;
     const PENDING_SUBSCRIBE_KEY = "topicAlertsPendingSubscribe";
+    const LAST_SUBSCRIBE_KEY = "topicAlertsLastSubscription";
     const FALLBACK_TOPICS = [
       "data-engineering",
       "machine-learning",
@@ -250,6 +355,80 @@
     function showNextSteps(link) {
       telegramLinkEl.href = link;
       nextStepsEl.classList.add("show");
+    }
+
+    function setProgress(step, markDone = false) {
+      progressSteps.forEach((el) => {
+        const value = Number(el.dataset.step);
+        el.classList.remove("active", "completed");
+        if (markDone || value < step) {
+          el.classList.add("completed");
+        }
+        if (!markDone && value === step) {
+          el.classList.add("active");
+        }
+      });
+      if (markDone) {
+        const finalStep = progressSteps.find((el) => el.dataset.step === "3");
+        if (finalStep) {
+          finalStep.classList.add("active");
+        }
+      }
+    }
+
+    function deriveBotUrl(deepLink) {
+      try {
+        const parsed = new URL(deepLink);
+        const username = parsed.pathname.replace("/", "").trim();
+        if (!username) {
+          return "";
+        }
+        return `https://t.me/${username}`;
+      } catch {
+        return "";
+      }
+    }
+
+    function showManageCard(botUrl) {
+      if (!botUrl) {
+        return;
+      }
+      openBotLinkEl.href = botUrl;
+      manageCardEl.classList.add("show");
+    }
+
+    async function copyCommand(command) {
+      try {
+        await navigator.clipboard.writeText(command);
+        showStatus(`Copied ${command}. Paste it in Telegram.`, "ok");
+      } catch {
+        showStatus(`Could not copy ${command}. Type it in Telegram manually.`, "error");
+      }
+    }
+
+    function saveLastSubscription(payload) {
+      sessionStorage.setItem(LAST_SUBSCRIBE_KEY, JSON.stringify(payload));
+    }
+
+    function loadLastSubscription() {
+      const raw = sessionStorage.getItem(LAST_SUBSCRIBE_KEY);
+      if (!raw) {
+        return null;
+      }
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return null;
+      }
+    }
+
+    function showLastSubscription(payload) {
+      if (!payload || !payload.topic || !payload.confirmedAt) {
+        return;
+      }
+      const when = new Date(payload.confirmedAt).toLocaleString();
+      lastSubscriptionTextEl.textContent = `${labelForTopic(payload.topic)} subscribed on ${when}.`;
+      lastSubscriptionEl.classList.add("show");
     }
 
     function savePendingSubscription(payload) {
@@ -286,17 +465,27 @@
         }
 
         if (data.status === "confirmed") {
+          const pending = loadPendingSubscription();
           clearPendingSubscription();
+          saveLastSubscription({
+            topic,
+            confirmedAt: Date.now(),
+            botUrl: pending?.botUrl || ""
+          });
+          showLastSubscription(loadLastSubscription());
           showStatus(`Subscribed successfully to ${labelForTopic(topic)}.`, "ok");
           nextStepsEl.classList.remove("show");
+          setProgress(3, true);
           return;
         }
         if (data.status === "expired") {
           clearPendingSubscription();
+          setProgress(1);
           throw new Error("This link expired. Please generate a new one.");
         }
         if (data.status === "invalid") {
           clearPendingSubscription();
+          setProgress(1);
           throw new Error("Subscription link is invalid. Please try again.");
         }
 
@@ -316,6 +505,8 @@
 
       showStatus("Waiting for Telegram confirmation...", "ok");
       showNextSteps(pending.deepLink);
+      setProgress(2);
+      showManageCard(pending.botUrl);
       pollInProgress = true;
       try {
         await pollSubscriptionStatus(pending.statusUrl, pending.topic, 30000);
@@ -393,6 +584,7 @@
 
       try {
         showStatus("Creating your Telegram subscribe link...", "ok");
+        setProgress(2);
 
         const response = await fetch(SUBSCRIBE_API, {
           method: "POST",
@@ -422,20 +614,37 @@
           statusUrl,
           topic,
           deepLink: data.deep_link,
+          botUrl: deriveBotUrl(data.deep_link),
           createdAt: Date.now()
         });
         showNextSteps(data.deep_link);
+        showManageCard(deriveBotUrl(data.deep_link));
         window.location.assign(data.deep_link);
       } catch (error) {
+        setProgress(1);
         showStatus(`Could not create Telegram link: ${error.message}`, "error");
       }
     });
 
     async function init() {
+      setProgress(1);
       await checkApiHealth();
       await loadTopics();
+      const last = loadLastSubscription();
+      showLastSubscription(last);
+      if (last && last.botUrl) {
+        showManageCard(last.botUrl);
+      }
       await resumePendingSubscription();
     }
+
+    topicSelect.addEventListener("change", () => {
+      if (topicSelect.value) {
+        setProgress(1);
+      }
+    });
+    topicsCmdBtn.addEventListener("click", () => copyCommand("/topics"));
+    unsubscribeAllCmdBtn.addEventListener("click", () => copyCommand("/unsubscribe_all"));
 
     window.addEventListener("focus", resumePendingSubscription);
     document.addEventListener("visibilitychange", () => {
